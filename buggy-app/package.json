@@ -1,0 +1,17 @@
+{
+  "name": "buggy-app",
+  "version": "1.0.0",
+  "description": "A buggy order processor for AI agent debugging demo",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.2",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,34 +1,36 @@
 """
-Stage 3: Full Tool Suite
+Stage 2: The Agent Loop (LLM + Tools + Loop)
 
-Same agent loop as Stage 2, but now with 7 tools imported from tools.py.
-Tools live in a separate module with schemas, a registry, and a dispatcher.
-This shows that the loop and tools are independent concerns.
+Builds on Stage 1 by adding a loop and tool calling.
+The LLM can now call tools, read results, and keep going until the task is done.
+This is the same core pattern used by Cursor, Claude Code, and Copilot agents.
 
 Run:
-  python stage3_agent_tools.py "create a hello.txt file"
-  python stage3_agent_tools.py  (interactive mode)
+  python agent.py "search the web for the latest Python version"
+  python agent.py  (interactive mode)
 """
 
 import os
 import sys
 import json
 import threading
+from datetime import date
 from openai import OpenAI
 from dotenv import load_dotenv
 
 # Step 1: Import tool schemas and dispatcher from the separate tools module
 from tools import TOOL_SCHEMAS, execute_tool
 
-# Step 2: Load environment variables and set up the OpenAI client
 load_dotenv()
 
 client = OpenAI()
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+
+# Step 2: Safety limit to prevent infinite loops
 MAX_ITERATIONS = 15
 
 
-# Step 3: Define color codes for terminal output
+# Step 3: Color constants for terminal output
 BLUE = "\033[94m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
@@ -102,17 +104,18 @@ def print_error(text):
     print(f"\n{RED}{BOLD}[ERROR]{RESET} {RED}{text}{RESET}")
 
 
-# Step 4: Define the system prompt that tells the LLM what tools it has
-SYSTEM_PROMPT = """You are a helpful AI assistant that accomplishes tasks by using tools.
+# Step 4: Build the system prompt dynamically so it always includes today's date
+def build_system_prompt() -> str:
+    today = date.today().strftime("%B %d, %Y")
+
+    return f"""You are a helpful AI assistant that accomplishes tasks by using tools.
+
+Today's date is {today}.
 
 You have access to these tools:
 - web_search: Search the web for current information
-- fetch_webpage: Fetch and read the content of a specific URL/webpage
-- list_files: List files in a directory (use this to find files before reading them)
-- read_file: Read the contents of a local file
+- fetch_webpage: Fetch a URL and return its text content
 - write_file: Write content to a file
-- run_bash: Execute short-lived shell commands (ls, mkdir, npm install, etc.)
-- run_background: Start long-running processes in the background (servers, watchers)
 
 INSTRUCTIONS:
 1. Break the task into steps and think about what to do.
@@ -124,24 +127,32 @@ IMPORTANT: Only stop (respond without tools) when the task is truly done.
 Think step by step. Be thorough but efficient."""
 
 
-# Step 5: The agent loop — sends messages to the LLM and executes tool calls
 def run_agent(user_task: str) -> str:
-    """Run the AI agent loop until the task is complete."""
+    """
+    Run the AI agent loop until the task is complete.
 
-    # Step 5a: Initialize the conversation with a system prompt and user task
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    print_system(SYSTEM_PROMPT)
+    Args:
+        user_task: What the user wants to accomplish
+
+    Returns:
+        The agent's final response text
+    """
+
+    # Step 5: Build the initial message list with system prompt and user task
+    system_prompt = build_system_prompt()
+    messages = [{"role": "system", "content": system_prompt}]
+    print_system(system_prompt)
 
     messages.append({"role": "user", "content": user_task})
     print_user(user_task)
 
-    # Step 5b: Loop until the LLM responds without tool calls (meaning it's done)
+    # Step 6: Start the agent loop — keep calling the LLM until it stops using tools
     iteration = 0
     while iteration < MAX_ITERATIONS:
         iteration += 1
         print_iteration(iteration, len(messages))
 
-        # Step 5c: Show a spinner while waiting for the API response
+        # Step 7: Show a spinner while waiting for the API response
         stop_spinner = threading.Event()
 
         def spinner():
@@ -155,7 +166,7 @@ def run_agent(user_task: str) -> str:
         spinner_thread = threading.Thread(target=spinner, daemon=True)
         spinner_thread.start()
 
-        # Step 5d: Call the OpenAI API with the conversation and tool schemas
+        # Step 8: Call the LLM with tools enabled so it can request tool calls
         try:
             response = client.chat.completions.create(
                 model=MODEL,
@@ -168,23 +179,29 @@ def run_agent(user_task: str) -> str:
             print_error(f"API call failed: {e}")
             return f"Error: {e}"
 
-        # Step 5e: Stop the spinner now that we have a response
+        # Step 9: Stop the spinner now that we have the response
         stop_spinner.set()
         spinner_thread.join()
 
-        # Step 5f: Add the assistant's reply to the conversation history
         assistant_message = response.choices[0].message
+
+        # Step 10: Add the LLM's response to the message history
         messages.append(assistant_message)
 
-        if assistant_message.content:
+        # Step 10a: If the LLM explained its reasoning alongside tool calls, show it
+        if assistant_message.content and assistant_message.tool_calls:
+            print(f"\n{MAGENTA}{BOLD}[REASONING]{RESET}")
+            for line in assistant_message.content.strip().split('\n'):
+                print(f"{MAGENTA}  {line}{RESET}")
+        elif assistant_message.content:
             print_llm(assistant_message.content)
 
-        # Step 5g: If no tool calls, the agent is done — return its final answer
+        # Step 11: Check the stop condition — no tool calls means the agent is done
         if not assistant_message.tool_calls:
             print_done(assistant_message.content)
             return assistant_message.content or ""
 
-        # Step 5h: Execute each tool call and add results to the conversation
+        # Step 12: Execute each tool the LLM requested and add results to messages
         for tool_call in assistant_message.tool_calls:
             tool_name = tool_call.function.name
             try:
@@ -194,11 +211,11 @@ def run_agent(user_task: str) -> str:
 
             print_tool_call(tool_name, tool_args)
 
-            # Step 5i: Dispatch the tool call to the tools module
             result = execute_tool(tool_name, tool_args)
 
             print_tool_result(tool_name, result)
 
+            # Step 13: Send the tool result back so the LLM can see it next iteration
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
@@ -209,7 +226,7 @@ def run_agent(user_task: str) -> str:
     return "Agent reached maximum iterations without completing the task."
 
 
-# Step 6: CLI entry point — handles both single-command and interactive mode
+# Step 14: CLI entry point — handles command-line args or starts interactive mode
 def main():
     if not os.getenv("OPENAI_API_KEY"):
         print_error(
@@ -220,20 +237,19 @@ def main():
         )
         sys.exit(1)
 
-    print_header("STAGE 3: FULL TOOL SUITE")
+    print_header("STAGE 2: AGENT LOOP (LLM + TOOLS + LOOP)")
     print(f"{DIM}  Model: {MODEL}")
     print(f"  Max iterations per turn: {MAX_ITERATIONS}")
-    print(f"  Tools: web_search, fetch_webpage, list_files, read_file, write_file, run_bash, run_background")
-    print(f"  Loop:  YES — same agent loop as Stage 2")
-    print(f"  Memory: NONE — each turn starts fresh")
+    print(f"  Tools: web_search, fetch_webpage, write_file (3 tools)")
     print(f"  Type 'quit' or 'exit' to stop.{RESET}")
-    print(f"\n{DIM}  Compare with Stage 2: same loop, but now the agent can do much more!{RESET}")
 
+    # Step 15: If a task was passed as a command-line argument, run it directly
     if len(sys.argv) > 1:
         task = " ".join(sys.argv[1:])
         run_agent(task)
         return
 
+    # Step 16: Interactive loop — each turn starts fresh (no memory across turns)
     while True:
         print(f"\n{BOLD}What should the agent do?{RESET}")
         try:

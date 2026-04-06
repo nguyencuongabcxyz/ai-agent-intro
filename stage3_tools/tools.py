@@ -113,17 +113,21 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "run_background",
-            "description": "Start a long-running process in the background (like a server, watcher, or dev tool). Returns immediately with the process ID. The process keeps running in the background.",
+            "name": "grep",
+            "description": "Search for a pattern in files. Use this to find specific text, function definitions, variable usages, or any pattern across files in a directory.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {
+                    "pattern": {
                         "type": "string",
-                        "description": "The command to run in the background (e.g. 'npx serve -p 3000')"
+                        "description": "The text or regex pattern to search for"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "The file or directory to search in (defaults to current directory)"
                     }
                 },
-                "required": ["command"]
+                "required": ["pattern"]
             }
         }
     },
@@ -333,36 +337,35 @@ def execute_run_bash(command: str) -> str:
         return f"Error running command: {e}"
 
 
-def execute_run_background(command: str) -> str:
-    """Start a long-running process in the background (servers, watchers, etc.)."""
+def execute_grep(pattern: str, path: str = ".") -> str:
+    """Search for a pattern in files using recursive grep."""
     try:
-        # Start the process fully detached — it won't block the agent
-        if os.name == "nt":
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-            )
-        else:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-
-        return (
-            f"Process started in background (PID: {process.pid}).\n"
-            f"Command: {command}\n"
-            f"Note: Output is not captured for background processes. "
-            f"The process will keep running after the agent finishes."
+        result = subprocess.run(
+            ["grep", "-r", "-n", "--include=*.py", "--include=*.js", "--include=*.ts",
+             "--include=*.md", "--include=*.txt", "--include=*.json", "--include=*.yaml",
+             "--include=*.yml", "--include=*.html", "--include=*.css",
+             pattern, path],
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
 
+        output = result.stdout.strip()
+        if not output:
+            return f"No matches found for pattern: '{pattern}' in {path}"
+
+        # Truncate to prevent context overflow
+        if len(output) > MAX_OUTPUT_CHARS:
+            output = output[:MAX_OUTPUT_CHARS] + "\n\n[... OUTPUT TRUNCATED ...]"
+
+        return output
+
+    except subprocess.TimeoutExpired:
+        return f"Error: Search timed out after 15 seconds"
+    except FileNotFoundError:
+        return f"Error: grep command not found. Path '{path}' may not exist."
     except Exception as e:
-        return f"Error starting background process: {e}"
+        return f"Error searching files: {e}"
 
 
 def execute_list_files(path: str = ".") -> str:
@@ -431,7 +434,7 @@ TOOL_REGISTRY = {
     "read_file": execute_read_file,
     "write_file": execute_write_file,
     "run_bash": execute_run_bash,
-    "run_background": execute_run_background,
+    "grep": execute_grep,
     "list_files": execute_list_files,
     "fetch_webpage": execute_fetch_webpage,
 }
