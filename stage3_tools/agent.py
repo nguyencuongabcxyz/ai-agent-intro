@@ -224,10 +224,7 @@ def main():
     print(f"{DIM}  Model: {MODEL}")
     print(f"  Max iterations per turn: {MAX_ITERATIONS}")
     print(f"  Tools: web_search, fetch_webpage, list_files, read_file, write_file, run_bash, grep")
-    print(f"  Loop:  YES — same agent loop as Stage 2")
-    print(f"  Memory: NONE — each turn starts fresh")
     print(f"  Type 'quit' or 'exit' to stop.{RESET}")
-    print(f"\n{DIM}  Compare with Stage 2: same loop, but now the agent can do much more!{RESET}")
 
     if len(sys.argv) > 1:
         task = " ".join(sys.argv[1:])
