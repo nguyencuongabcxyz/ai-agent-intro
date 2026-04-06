@@ -24,7 +24,7 @@ from tools import TOOL_SCHEMAS, execute_tool
 load_dotenv()
 
 client = OpenAI()
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
 MAX_ITERATIONS = 15
 
 
@@ -119,6 +119,10 @@ INSTRUCTIONS:
 2. Use one or more tools to accomplish each step.
 3. After each tool result, analyze it and decide what to do next.
 4. When the task is FULLY COMPLETE, respond with your final answer as plain text WITHOUT calling any tools.
+
+SHELL COMMANDS: When running commands like npm test or npx jest, always cd into the
+project directory first (e.g. "cd tdd-demo && npm test"). Never run test commands from
+the root directory — it picks up unrelated projects and causes errors.
 
 IMPORTANT: Only stop (respond without tools) when the task is truly done.
 Think step by step. Be thorough but efficient."""
