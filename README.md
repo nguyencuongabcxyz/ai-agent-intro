@@ -140,3 +140,9 @@ When the agent runs, you'll see colored output showing every step:
           │
           └──────── Loop back to LLM API Call
 ```
+
+Anatomy of an AI Agent
+
+From Genius to Agent
+
+How a Trapped Genius Learned to Act

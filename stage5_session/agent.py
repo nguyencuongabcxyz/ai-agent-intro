@@ -224,11 +224,7 @@ def main():
     print(f"{DIM}  Model: {MODEL}")
     print(f"  Max iterations per turn: {MAX_ITERATIONS}")
     print(f"  Tools: web_search, fetch_webpage, list_files, read_file, write_file, run_bash, grep")
-    print(f"  Loop:  YES — same agent loop as Stages 2-4")
-    print(f"  Memory: YES — the agent remembers the entire conversation!")
     print(f"  Type 'quit' or 'exit' to stop.{RESET}")
-    print(f"\n{DIM}  Try: tell it your name, then ask it later — it remembers!{RESET}")
-    print(f"{DIM}  Compare with Stage 3: same tools and loop, but now with memory.{RESET}")
 
     # Step 5b: Create the messages list ONCE — this is the session's memory
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
