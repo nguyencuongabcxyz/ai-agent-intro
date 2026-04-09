@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import threading
+from datetime import date
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -102,8 +103,13 @@ def print_error(text):
     print(f"\n{RED}{BOLD}[ERROR]{RESET} {RED}{text}{RESET}")
 
 
-# Step 4: Define the system prompt that tells the LLM what tools it has
-SYSTEM_PROMPT = """You are a helpful AI assistant that accomplishes tasks by using tools.
+# Step 4: Build the system prompt dynamically so it always includes today's date
+def build_system_prompt() -> str:
+    today = date.today().strftime("%B %d, %Y")
+
+    return f"""You are a helpful AI assistant that accomplishes tasks by using tools.
+
+Today's date is {today}.
 
 You have access to these tools:
 - web_search: Search the web for current information
@@ -133,8 +139,9 @@ def run_agent(user_task: str) -> str:
     """Run the AI agent loop until the task is complete."""
 
     # Step 5a: Initialize the conversation with a system prompt and user task
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    print_system(SYSTEM_PROMPT)
+    system_prompt = build_system_prompt()
+    messages = [{"role": "system", "content": system_prompt}]
+    print_system(system_prompt)
 
     messages.append({"role": "user", "content": user_task})
     print_user(user_task)

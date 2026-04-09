@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import threading
+from datetime import date
 from openai import OpenAI
 from dotenv import load_dotenv
 from tools import TOOL_SCHEMAS, execute_tool
@@ -105,8 +106,13 @@ def print_session_info(message_count):
     print(f"\n{WHITE}{BOLD}[SESSION]{RESET} {WHITE}{message_count} messages in memory{RESET}")
 
 
-# Step 3: Define the system prompt — tells the LLM what tools it has and how to behave
-SYSTEM_PROMPT = """You are a helpful AI assistant that accomplishes tasks by using tools.
+# Step 3: Build the system prompt dynamically so it always includes today's date
+def build_system_prompt() -> str:
+    today = date.today().strftime("%B %d, %Y")
+
+    return f"""You are a helpful AI assistant that accomplishes tasks by using tools.
+
+Today's date is {today}.
 
 You have access to these tools:
 - web_search: Search the web for current information
@@ -227,8 +233,9 @@ def main():
     print(f"  Type 'quit' or 'exit' to stop.{RESET}")
 
     # Step 5b: Create the messages list ONCE — this is the session's memory
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    print_system(SYSTEM_PROMPT)
+    system_prompt = build_system_prompt()
+    messages = [{"role": "system", "content": system_prompt}]
+    print_system(system_prompt)
 
     # Step 5c: If a command-line argument was provided, use it as the first turn
     if len(sys.argv) > 1:

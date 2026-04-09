@@ -14,6 +14,7 @@ import sys
 import json
 import asyncio
 import threading
+from datetime import date
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -108,9 +109,12 @@ def print_mcp_info(text):
 # Step 3: Build the system prompt from whatever tools the MCP server provides
 def build_system_prompt(tool_names: list[str]) -> str:
     """Build the system prompt dynamically from discovered MCP tools."""
+    today = date.today().strftime("%B %d, %Y")
     tools_list = "\n".join(f"- {name}" for name in tool_names)
 
     return f"""You are a helpful AI assistant that accomplishes tasks using MCP (Model Context Protocol) tools.
+
+Today's date is {today}.
 
 You have access to tools provided by the Atlassian MCP server, which lets you interact with Jira and Confluence:
 
